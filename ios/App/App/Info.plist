@@ -3,9 +3,10 @@
 <plist version="1.0">
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-  	<string>Describe why you need access to user's photos (getting albums and media)</string>
-  	<key>NSPhotoLibraryAddUsageDescription</key>
-  	<string>Describe why you need to add photos to user's photo library</string>
+	<string>Мы используем галерею только для выбора изображений</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Требуется для сохранения изображений</string>
+
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>

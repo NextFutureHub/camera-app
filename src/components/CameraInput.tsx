@@ -1,45 +1,79 @@
 import { useEffect, useState } from "react";
-import { Media } from "@capacitor-community/media";
 import { Capacitor } from "@capacitor/core";
 
-declare module "@capacitor-community/media" {
-  export interface MediaPlugin {
-    pickImages(options: {
-      limit: number;
-    }): Promise<{ photos: { path: string }[] }>;
+declare global {
+  interface Window {
+    cordova: any;
   }
+}
+
+interface PhotoLibraryItem {
+  photoURL: string;
+  [key: string]: any;
 }
 
 const ImageInput = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string>("Unknown");
-  const [mediaAvailable, setMediaAvailable] = useState<boolean>(false);
   const [isNative, setIsNative] = useState<boolean>(false);
+  const [authorized, setAuthorized] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const currentPlatform = Capacitor.getPlatform();
     setPlatform(currentPlatform);
+    setIsNative(Capacitor.isNativePlatform());
 
-    const available =
-      currentPlatform !== "web" && typeof Media.pickImages === "function";
-    setMediaAvailable(available);
-
-    const native = Capacitor.isNativePlatform();
-    setIsNative(native);
+    document.addEventListener("deviceready", requestAuthorization, false);
   }, []);
 
-  const pickImageFromGallery = async () => {
-    try {
-      const result = await Media.pickImages({ limit: 1 });
+  const requestAuthorization = () => {
+    const photoLibrary = window.cordova?.plugins?.photoLibrary;
 
-      if (result && result.photos.length > 0) {
-        const photo = result.photos[0];
-        setSelectedImage(photo.path);
-        console.log("Selected photo path:", photo.path);
-      }
-    } catch (error) {
-      console.error("Ошибка при выборе изображения:", error);
+    if (!photoLibrary) {
+      setError("Плагин PhotoLibrary не доступен.");
+      return;
     }
+
+    photoLibrary.requestAuthorization(
+      { read: true, write: false },
+      () => {
+        setAuthorized(true);
+      },
+      (authError: any) => {
+        setError("Авторизация не получена: " + JSON.stringify(authError));
+      }
+    );
+  };
+
+  const pickImageFromGallery = async () => {
+    const photoLibrary = window.cordova?.plugins?.photoLibrary;
+
+    if (!photoLibrary) {
+      setError("Плагин PhotoLibrary не доступен.");
+      return;
+    }
+
+    photoLibrary.getLibrary(
+      (library: PhotoLibraryItem[]) => {
+        if (library.length > 0) {
+          const firstPhoto = library[0];
+          setSelectedImage(firstPhoto.photoURL);
+          console.log("Выбрано изображение:", firstPhoto.photoURL);
+        } else {
+          setError("Нет доступных изображений.");
+        }
+      },
+      (err: any) => {
+        setError("Ошибка при получении библиотеки: " + JSON.stringify(err));
+      },
+      {
+        thumbnailWidth: 512,
+        thumbnailHeight: 384,
+        quality: 0.8,
+        itemsInChunk: 50,
+      }
+    );
   };
 
   return (
@@ -49,21 +83,27 @@ const ImageInput = () => {
           <strong>Платформа:</strong> {platform}
         </p>
         <p>
-          <strong>Media Plugin доступен:</strong>{" "}
-          {mediaAvailable ? "Да" : "Нет"}
-        </p>
-        <p>
           <strong>isNativePlatform():</strong>{" "}
           {isNative ? "Да (native)" : "Нет (web)"}
         </p>
+        <p>
+          <strong>Авторизация:</strong> {authorized ? "Да" : "Нет"}
+        </p>
+        {error && (
+          <p style={{ color: "red" }}>
+            <strong>Ошибка:</strong> {error}
+          </p>
+        )}
       </div>
 
-      <button onClick={pickImageFromGallery}>Загрузить из галереи</button>
+      <button onClick={pickImageFromGallery} disabled={!authorized}>
+        Загрузить из галереи
+      </button>
+
       <div style={{ textAlign: "center", padding: "20px" }}>
-        <p>v9 | 04.05 | logs</p>
+        <p>v11 | 05.05 | PhotoLibrary</p>
       </div>
 
-      {/* Если изображение выбрано, показываем его */}
       {selectedImage && (
         <div style={{ marginTop: "20px" }}>
           <h2>Выбранное изображение</h2>
